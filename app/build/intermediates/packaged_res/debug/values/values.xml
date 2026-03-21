@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#3390EC</color>
+    <color name="background">#121212</color>
+    <color name="card">#1E1E1E</color>
+    <color name="green">#4CAF50</color>
+    <color name="primary">#3390EC</color>
+    <color name="primary_dark">#121212</color>
+    <color name="red">#F44336</color>
+    <color name="text_primary">#E0E0E0</color>
+    <color name="text_secondary">#888888</color>
+    <string name="app_name">TG Proxy</string>
+    <style name="AppTheme" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">#3390EC</item>
+        <item name="colorPrimaryDark">#121212</item>
+        <item name="colorAccent">#3390EC</item>
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:statusBarColor">#121212</item>
+        <item name="android:navigationBarColor">#121212</item>
+    </style>
+</resources>

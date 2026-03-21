@@ -1,0 +1,34 @@
+[
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\drawable_ic_launcher.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\drawable\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\drawable_btn_stop_bg.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\drawable\\btn_stop_bg.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\drawable_card_bg.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\drawable\\card_bg.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\drawable_btn_start_bg.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\drawable\\btn_start_bg.xml"
+    },
+    {
+        "merged": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-merged_res-39:\\drawable_edit_bg.xml.flat",
+        "source": "C:\\Users\\anime\\.gradle\\daemon\\8.2\\com.tgproxy.app-main-41:\\drawable\\edit_bg.xml"
+    },
+    {
+        "merged": "com.tgproxy.app-merged_res-39:/layout_activity_main.xml.flat",
+        "source": "com.tgproxy.app-main-41:/layout/activity_main.xml"
+    }
+]
