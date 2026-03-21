@@ -32,7 +32,7 @@
 ## 📸 Дизайн и Интерфейс
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Genuys/TelegramUnlockAppAndroid2026/main/proxy_logo_cyberpunk.png" width="250px" alt="TG Proxy Logo"/>
+  <img src="https://i.postimg.cc/CLkV8kWs/Screenshot-20260322-001729.jpg" width="250px" alt="TG Proxy Logo"/>
   <br/>
   <em>Стильный темный интерфейс (Dark Mode Glassmorphism)</em>
 </div>
