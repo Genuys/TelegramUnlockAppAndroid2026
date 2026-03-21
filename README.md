@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Genuys/TelegramUnlockAppAndroid2026/main/github_banner_proxy.png" width="100%" alt="TG Proxy 2026 Banner"/>
+  <img src="https://i.postimg.cc/wxDWc2jz/1774128022158-3.jpg" width="100%" alt="TG Proxy 2026 Banner"/>
 
   <h1>🚀 TG Proxy Android 2026</h1>
   <p><strong>Ультра-быстрый локальный SOCKS5-прокси со встроенным WebSocket/VLESS обходом блокировок для Telegram</strong></p>
