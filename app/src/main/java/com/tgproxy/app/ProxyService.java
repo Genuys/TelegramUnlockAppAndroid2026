@@ -26,6 +26,7 @@ public class ProxyService extends Service {
     private PowerManager.WakeLock wakeLock;
     private Handler handler;
     private int port;
+    private String boundIp = "127.0.0.1";
 
     private static ProxyService instance;
 
@@ -51,7 +52,7 @@ public class ProxyService extends Service {
         if (engine != null && engine.boundIp != null) {
             return engine.boundIp;
         }
-        return "127.0.0.1";
+        return boundIp;
     }
 
     @Override
@@ -79,11 +80,14 @@ public class ProxyService extends Service {
         if (dynamicPort) {
             port = 10000 + new Random().nextInt(50000);
         } else {
-            port = 1080;
+            port = prefs.getInt("custom_port", 1080);
+            if (port < 1 || port > 65535) port = 1080;
         }
 
+        boundIp = prefs.getString("custom_ip", "127.0.0.1");
+        if (boundIp == null || boundIp.trim().isEmpty()) boundIp = "127.0.0.1";
+
         int mode = prefs.getInt("proxy_mode", ProxyEngine.MODE_ORIGINAL);
-        boolean rotateIp = prefs.getBoolean("rotate_ip", false);
         String vlessUri = prefs.getString("vless_uri", "");
 
         startForeground(NOTIF_ID, buildNotification());
@@ -92,7 +96,7 @@ public class ProxyService extends Service {
         engine = new ProxyEngine();
         engine.setMode(mode);
         engine.setVlessUri(vlessUri);
-        engine.setRotateIp(rotateIp);
+        engine.setBoundIp(boundIp);
 
         new Thread(() -> {
             try {
@@ -154,7 +158,7 @@ public class ProxyService extends Service {
         }
 
         return b.setContentTitle("TG Proxy")
-                .setContentText("127.0.0.1:" + port)
+                .setContentText(boundIp + ":" + port)
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .setContentIntent(pi)
                 .setOngoing(true)

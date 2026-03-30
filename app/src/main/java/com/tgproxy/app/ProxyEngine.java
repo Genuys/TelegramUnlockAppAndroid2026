@@ -25,7 +25,6 @@ public class ProxyEngine {
     private ExecutorService pool;
     private int mode = MODE_ORIGINAL;
     private String vlessUri = "";
-    private boolean rotateIp = false;
     private int rotateIdx = 0;
     private final WsPool wsPool = new WsPool();
 
@@ -58,15 +57,15 @@ public class ProxyEngine {
         this.vlessUri = uri;
     }
 
-    public void setRotateIp(boolean r) {
-        this.rotateIp = r;
-    }
-
     public int getMode() {
         return mode;
     }
 
-    public String boundIp = "127.0.0.1";
+    public volatile String boundIp = "127.0.0.1";
+
+    public void setBoundIp(String ip) {
+        this.boundIp = (ip != null && !ip.trim().isEmpty()) ? ip.trim() : "127.0.0.1";
+    }
 
     public void start(int port) throws IOException {
         if (running) return;
@@ -74,20 +73,13 @@ public class ProxyEngine {
         serverSocket = new ServerSocket();
         serverSocket.setReuseAddress(true);
 
-        if (rotateIp) {
-            java.util.Random rnd = new java.util.Random();
-            boundIp = "127." + rnd.nextInt(255) + "." + rnd.nextInt(255) + "." + (rnd.nextInt(254) + 1);
-        } else {
-            boundIp = "127.0.0.1";
-        }
-
         try {
             serverSocket.bind(new InetSocketAddress(boundIp, port));
         } catch (Exception e) {
             boundIp = "127.0.0.1";
-            serverSocket.bind(new InetSocketAddress(boundIp, port)); // fallback
+            serverSocket.bind(new InetSocketAddress(boundIp, port));
         }
-        
+
         pool = Executors.newCachedThreadPool();
         wsPool.warmup();
 
@@ -127,12 +119,13 @@ public class ProxyEngine {
     private void handleClient(Socket client) {
         activeSockets.add(client);
         try {
-            client.setReceiveBufferSize(262144);
-            client.setSendBufferSize(262144);
+            client.setReceiveBufferSize(524288);
+            client.setSendBufferSize(524288);
             client.setTcpNoDelay(true);
+            client.setKeepAlive(true);
 
-            InputStream in = new java.io.BufferedInputStream(client.getInputStream(), TgConstants.BUF);
-            OutputStream out = new java.io.BufferedOutputStream(client.getOutputStream(), TgConstants.BUF);
+            InputStream in = client.getInputStream();
+            OutputStream out = client.getOutputStream();
 
             byte[] hdr = readExactly(in, 2);
             if (hdr[0] != 5) {
@@ -291,7 +284,7 @@ public class ProxyEngine {
         connWs.incrementAndGet();
 
         ws.send(init);
-        bridgeWs(in, out, ws, init);
+        bridgeWs(in, out, ws, null);
     }
 
     private void handlePython(Socket client, InputStream in, OutputStream out, String dst, int port) throws Exception {
@@ -349,16 +342,7 @@ public class ProxyEngine {
         }
 
         String[] domains = TgConstants.wsDomains(dc, isMedia);
-        String targetIp;
-
-        if (rotateIp) {
-            int[] dcs = {1, 2, 3, 4, 5};
-            int idx = (rotateIdx++) % dcs.length;
-            int rotDc = dcs[idx];
-            targetIp = TgConstants.DC_IPS.getOrDefault(rotDc, TgConstants.DC_IPS.get(dc));
-        } else {
-            targetIp = TgConstants.DC_IPS.get(dc);
-        }
+        String targetIp = TgConstants.DC_IPS.get(dc);
 
         RawWebSocket ws = wsPool.get(dc, isMedia, targetIp, domains);
         boolean hadRedirect = false;
@@ -471,9 +455,10 @@ public class ProxyEngine {
         Socket remote = new Socket();
         try {
             remote.connect(new InetSocketAddress(dst, port), 10000);
-            remote.setReceiveBufferSize(262144);
-            remote.setSendBufferSize(262144);
+            remote.setReceiveBufferSize(524288);
+            remote.setSendBufferSize(524288);
             remote.setTcpNoDelay(true);
+            remote.setKeepAlive(true);
         } catch (Exception e) {
             out.write(socks5Reply(5));
             out.flush();
@@ -484,8 +469,8 @@ public class ProxyEngine {
         out.write(socks5Reply(0));
         out.flush();
 
-        InputStream remoteIn = new java.io.BufferedInputStream(remote.getInputStream(), TgConstants.BUF);
-        OutputStream remoteOut = new java.io.BufferedOutputStream(remote.getOutputStream(), TgConstants.BUF);
+        InputStream remoteIn = remote.getInputStream();
+        OutputStream remoteOut = remote.getOutputStream();
 
         Thread t1 = new Thread(() -> pipe(in, remoteOut));
         Thread t2 = new Thread(() -> pipe(remoteIn, out));
@@ -510,11 +495,12 @@ public class ProxyEngine {
         try {
             Socket remote = new Socket();
             remote.connect(new InetSocketAddress(dst, port), 10000);
-            remote.setReceiveBufferSize(262144);
-            remote.setSendBufferSize(262144);
+            remote.setReceiveBufferSize(524288);
+            remote.setSendBufferSize(524288);
             remote.setTcpNoDelay(true);
-            InputStream remoteIn = new java.io.BufferedInputStream(remote.getInputStream(), TgConstants.BUF);
-            OutputStream remoteOut = new java.io.BufferedOutputStream(remote.getOutputStream(), TgConstants.BUF);
+            remote.setKeepAlive(true);
+            InputStream remoteIn = remote.getInputStream();
+            OutputStream remoteOut = remote.getOutputStream();
             remoteOut.write(init);
             remoteOut.flush();
 

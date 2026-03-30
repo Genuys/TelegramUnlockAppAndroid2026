@@ -26,21 +26,22 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
-import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Button btnStart, btnStop;
+    private Button btnStart, btnStop, btnQpEast, btnQpRu;
     private TextView tvStatus, tvAddress, tvPort, tvTgLink, tvPing, tvTraffic, tvUptime;
     private RadioGroup rgMode;
     private RadioButton rbOriginal, rbPython, rbVless;
-    private EditText etVless;
+    private EditText etVless, etCustomPort, etCustomIp, etTgIp;
     private LinearLayout llVless;
-    private CheckBox cbDynamicPort, cbRotateIp, cbAutostart;
+    private CheckBox cbDynamicPort, cbAutostart;
     private Handler handler;
     private Runnable statsUpdater;
     private SharedPreferences prefs;
+    private volatile boolean pingRunning = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,8 +67,12 @@ public class MainActivity extends AppCompatActivity {
         etVless = findViewById(R.id.et_vless);
         llVless = findViewById(R.id.ll_vless);
         cbDynamicPort = findViewById(R.id.cb_dynamic_port);
-        cbRotateIp = findViewById(R.id.cb_rotate_ip);
         cbAutostart = findViewById(R.id.cb_autostart);
+        etCustomPort = findViewById(R.id.et_custom_port);
+        etCustomIp = findViewById(R.id.et_custom_ip);
+        etTgIp = findViewById(R.id.et_tg_ip);
+        btnQpEast = findViewById(R.id.btn_qp_east);
+        btnQpRu = findViewById(R.id.btn_qp_ru);
 
         int savedMode = prefs.getInt("proxy_mode", ProxyEngine.MODE_ORIGINAL);
         switch (savedMode) {
@@ -85,8 +90,16 @@ public class MainActivity extends AppCompatActivity {
 
         etVless.setText(prefs.getString("vless_uri", ""));
         cbDynamicPort.setChecked(prefs.getBoolean("dynamic_port", false));
-        cbRotateIp.setChecked(prefs.getBoolean("rotate_ip", false));
         cbAutostart.setChecked(prefs.getBoolean("autostart_open", false));
+
+        int savedPort = prefs.getInt("custom_port", 1080);
+        etCustomPort.setText(String.valueOf(savedPort));
+
+        String savedIp = prefs.getString("custom_ip", "127.0.0.1");
+        etCustomIp.setText(savedIp);
+
+        String savedTgIp = prefs.getString("tg_ping_ip", "149.154.167.220");
+        etTgIp.setText(savedTgIp);
 
         rgMode.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.rb_vless) {
@@ -103,17 +116,21 @@ public class MainActivity extends AppCompatActivity {
 
         cbDynamicPort.setOnCheckedChangeListener((v, c) ->
                 prefs.edit().putBoolean("dynamic_port", c).apply());
-        cbRotateIp.setOnCheckedChangeListener((v, c) ->
-                prefs.edit().putBoolean("rotate_ip", c).apply());
         cbAutostart.setOnCheckedChangeListener((v, c) ->
                 prefs.edit().putBoolean("autostart_open", c).apply());
 
         btnStart.setOnClickListener(v -> startProxy());
         btnStop.setOnClickListener(v -> stopProxy());
+        btnQpEast.setOnClickListener(v -> openQuickProxy(
+                "tg://proxy?server=peyk.acharbashi.info&port=4515" +
+                "&secret=7umk8jsddowEqNfzkSDKW25iaXNjb3R0aS55ZWt0YW5ldC5jb20"));
+        btnQpRu.setOnClickListener(v -> openQuickProxy(
+                "tg://proxy?server=wiseprox.sbrf-cdn342.ru&port=443" +
+                "&secret=000102030405060708090a0b0c0d0e0f"));
 
         setupCopyOnTap(tvAddress);
         setupCopyOnTap(tvPort);
-        setupCopyOnTap(tvTgLink);
+        setupTgLinkTap(tvTgLink);
         setupCopyOnTap(tvPing);
         setupCopyOnTap(tvTraffic);
 
@@ -124,7 +141,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 updateStats();
-                handler.postDelayed(this, 1000);
+                handler.postDelayed(this, 2000);
             }
         };
 
@@ -147,6 +164,21 @@ public class MainActivity extends AppCompatActivity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
         } catch (Exception ignored) {
+        }
+    }
+
+    private void openQuickProxy(String tgUrl) {
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(tgUrl));
+            startActivity(i);
+        } catch (Exception e) {
+            try {
+                String web = tgUrl
+                        .replace("tg://proxy?", "https://t.me/proxy?")
+                        .replace("tg://proxy?", "https://t.me/proxy?");
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(web)));
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -186,6 +218,24 @@ public class MainActivity extends AppCompatActivity {
         else if (rbPython.isChecked()) e.putInt("proxy_mode", ProxyEngine.MODE_PYTHON);
         else if (rbVless.isChecked()) e.putInt("proxy_mode", ProxyEngine.MODE_VLESS);
         e.putString("vless_uri", etVless.getText().toString().trim());
+
+        String portStr = etCustomPort.getText().toString().trim();
+        int port = 1080;
+        try {
+            port = Integer.parseInt(portStr);
+            if (port < 1 || port > 65535) port = 1080;
+        } catch (NumberFormatException ignored) {
+        }
+        e.putInt("custom_port", port);
+
+        String ip = etCustomIp.getText().toString().trim();
+        if (ip.isEmpty()) ip = "127.0.0.1";
+        e.putString("custom_ip", ip);
+
+        String tgIp = etTgIp.getText().toString().trim();
+        if (tgIp.isEmpty()) tgIp = "149.154.167.220";
+        e.putString("tg_ping_ip", tgIp);
+
         e.apply();
     }
 
@@ -199,7 +249,7 @@ public class MainActivity extends AppCompatActivity {
         if (running) {
             btnStart.setEnabled(false);
             btnStop.setEnabled(true);
-            tvStatus.setText("\u2705 \u0410\u043A\u0442\u0438\u0432\u0435\u043D");
+            tvStatus.setText("\u2705 \u0410\u043a\u0442\u0438\u0432\u0435\u043d");
             tvStatus.setTextColor(0xFF4CAF50);
 
             if (pulseAnim == null) {
@@ -225,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
             tvStatus.setScaleX(1f);
             tvStatus.setScaleY(1f);
             tvStatus.setAlpha(1f);
-            tvStatus.setText("\u274C \u041E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D");
+            tvStatus.setText("\u274C \u041e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d");
             tvStatus.setTextColor(0xFFF44336);
             tvAddress.setText("-");
             tvPort.setText("-");
@@ -260,22 +310,102 @@ public class MainActivity extends AppCompatActivity {
             tvUptime.setText(timeStr);
         }
 
-        new Thread(() -> {
-            try {
-                long start = System.currentTimeMillis();
-                java.net.Socket s = new java.net.Socket();
-                s.connect(new java.net.InetSocketAddress("venus.web.telegram.org", 443), 2000);
-                long elapsed = System.currentTimeMillis() - start;
-                s.close();
-                handler.post(() -> tvPing.setText(elapsed + " ms"));
-            } catch (Exception e) {
-                handler.post(() -> tvPing.setText("err"));
-            }
-        }).start();
-
         svc.updateNotification(svc.getIp() + ":" + svc.getPort() +
                 " | \u2191" + TgConstants.humanBytes(up) +
                 " \u2193" + TgConstants.humanBytes(down));
+
+        if (!pingRunning) {
+            pingRunning = true;
+            new Thread(() -> {
+                try {
+                    String tgIp = prefs.getString("tg_ping_ip", "149.154.167.220");
+                    int proxyPort = svc.getPort();
+                    String proxyIp = svc.getIp();
+                    long start = System.currentTimeMillis();
+                    Socket s = new Socket();
+                    s.connect(new InetSocketAddress(proxyIp, proxyPort), 3000);
+                    s.setSoTimeout(3000);
+                    s.setTcpNoDelay(true);
+
+                    java.io.OutputStream out = s.getOutputStream();
+                    java.io.InputStream in = s.getInputStream();
+
+                    byte[] tgIpBytes;
+                    try {
+                        tgIpBytes = java.net.InetAddress.getByName(tgIp).getAddress();
+                    } catch (Exception ex) {
+                        tgIpBytes = new byte[]{(byte)149, (byte)154, (byte)167, (byte)220};
+                    }
+
+                    out.write(new byte[]{0x05, 0x01, 0x00});
+                    out.flush();
+                    byte[] authResp = new byte[2];
+                    int ar = 0;
+                    while (ar < 2) {
+                        int r = in.read(authResp, ar, 2 - ar);
+                        if (r == -1) throw new java.io.IOException("EOF");
+                        ar += r;
+                    }
+
+                    byte[] req = new byte[10];
+                    req[0] = 0x05;
+                    req[1] = 0x01;
+                    req[2] = 0x00;
+                    req[3] = 0x01;
+                    req[4] = tgIpBytes[0];
+                    req[5] = tgIpBytes[1];
+                    req[6] = tgIpBytes[2];
+                    req[7] = tgIpBytes[3];
+                    req[8] = (byte)(443 >> 8);
+                    req[9] = (byte)(443 & 0xFF);
+                    out.write(req);
+                    out.flush();
+
+                    byte[] resp = new byte[10];
+                    int rr = 0;
+                    while (rr < 10) {
+                        int r = in.read(resp, rr, 10 - rr);
+                        if (r == -1) throw new java.io.IOException("EOF");
+                        rr += r;
+                    }
+
+                    long elapsed = System.currentTimeMillis() - start;
+                    s.close();
+
+                    if (resp[1] == 0x00) {
+                        handler.post(() -> tvPing.setText(elapsed + " ms"));
+                    } else {
+                        handler.post(() -> tvPing.setText("err"));
+                    }
+                } catch (Exception e) {
+                    handler.post(() -> tvPing.setText("err"));
+                } finally {
+                    pingRunning = false;
+                }
+            }).start();
+        }
+    }
+
+    private void setupTgLinkTap(TextView tv) {
+        tv.setOnClickListener(v -> {
+            String text = tv.getText().toString();
+            if (text.equals("-")) return;
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(text)));
+            } catch (Exception e) {
+                ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
+                Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
+            }
+        });
+        tv.setOnLongClickListener(v -> {
+            String text = tv.getText().toString();
+            if (text.equals("-")) return false;
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
+            Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
+            return true;
+        });
     }
 
     private void setupCopyOnTap(TextView tv) {
@@ -284,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
             if (text.equals("-")) return;
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
-            Toast.makeText(this, "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
         });
     }
 

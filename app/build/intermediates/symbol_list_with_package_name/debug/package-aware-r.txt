@@ -3259,6 +3259,8 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
+id btn_qp_east
+id btn_qp_ru
 id btn_start
 id btn_stop
 id buttonPanel
@@ -3268,7 +3270,6 @@ id cancel_button
 id carryVelocity
 id cb_autostart
 id cb_dynamic_port
-id cb_rotate_ip
 id center
 id centerCrop
 id centerInside
@@ -3344,6 +3345,9 @@ id end
 id endToStart
 id enterAlways
 id enterAlwaysCollapsed
+id et_custom_ip
+id et_custom_port
+id et_tg_ip
 id et_vless
 id exitUntilCollapsed
 id expand_activities_button

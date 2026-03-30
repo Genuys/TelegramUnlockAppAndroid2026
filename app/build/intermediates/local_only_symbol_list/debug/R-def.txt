@@ -14,11 +14,15 @@ drawable btn_stop_bg
 drawable card_bg
 drawable edit_bg
 drawable ic_launcher
+id btn_qp_east
+id btn_qp_ru
 id btn_start
 id btn_stop
 id cb_autostart
 id cb_dynamic_port
-id cb_rotate_ip
+id et_custom_ip
+id et_custom_port
+id et_tg_ip
 id et_vless
 id ll_vless
 id rb_original

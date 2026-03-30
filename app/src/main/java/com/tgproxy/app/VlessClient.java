@@ -171,7 +171,7 @@ public class VlessClient {
                 addrType = 1;
                 addrBytes = raw;
             } else {
-                addrType = 3; // IPv6 is 3 in Vless
+                addrType = 3;
                 addrBytes = raw;
             }
         } catch (Exception e) {
