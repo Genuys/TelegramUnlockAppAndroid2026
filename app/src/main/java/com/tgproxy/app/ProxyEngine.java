@@ -21,11 +21,11 @@ public class ProxyEngine {
     public static final int MODE_VLESS = 3;
 
     private volatile boolean running = false;
+    private volatile boolean paused = false;
     private ServerSocket serverSocket;
     private ExecutorService pool;
     private int mode = MODE_ORIGINAL;
     private String vlessUri = "";
-    private int rotateIdx = 0;
     private final WsPool wsPool = new WsPool();
 
     public final AtomicLong bytesUp = new AtomicLong(0);
@@ -67,12 +67,21 @@ public class ProxyEngine {
         this.boundIp = (ip != null && !ip.trim().isEmpty()) ? ip.trim() : "127.0.0.1";
     }
 
+    public void setMobileMode(boolean mobile) {
+        // Kept for compatibility with ProxyService
+    }
+
+    public boolean isMobileMode() {
+        return false;
+    }
+
     public void start(int port) throws IOException {
         if (running) return;
         running = true;
+        paused = false;
+        
         serverSocket = new ServerSocket();
         serverSocket.setReuseAddress(true);
-
         try {
             serverSocket.bind(new InetSocketAddress(boundIp, port));
         } catch (Exception e) {
@@ -84,25 +93,71 @@ public class ProxyEngine {
         wsPool.warmup();
 
         pool.submit(() -> {
-            while (running && !serverSocket.isClosed()) {
+            while (running && !paused && !serverSocket.isClosed()) {
                 try {
                     Socket client = serverSocket.accept();
                     client.setTcpNoDelay(true);
                     connTotal.incrementAndGet();
                     pool.submit(() -> handleClient(client));
                 } catch (Exception e) {
-                    if (running) errors.incrementAndGet();
+                    if (running && !paused) errors.incrementAndGet();
                 }
             }
         });
     }
 
-    public void stop() {
-        running = false;
+    public void pause() {
+        paused = true;
         try {
             if (serverSocket != null) serverSocket.close();
-        } catch (Exception ignored) {
+        } catch (Exception ignored) {}
+        wsPool.stop();
+        for (Socket s : activeSockets) {
+            try { s.close(); } catch (Exception ignored) {}
         }
+        activeSockets.clear();
+    }
+
+    public void resume(int port) throws IOException {
+        if (!running) return;
+        paused = false;
+        serverSocket = new ServerSocket();
+        serverSocket.setReuseAddress(true);
+        serverSocket.bind(new InetSocketAddress(boundIp, port));
+        
+        wsPool.warmup();
+
+        if (pool == null || pool.isShutdown()) {
+            pool = Executors.newCachedThreadPool();
+        }
+
+        pool.submit(() -> {
+            while (running && !paused && !serverSocket.isClosed()) {
+                try {
+                    Socket client = serverSocket.accept();
+                    client.setTcpNoDelay(true);
+                    connTotal.incrementAndGet();
+                    pool.submit(() -> handleClient(client));
+                } catch (Exception e) {
+                    if (running && !paused) errors.incrementAndGet();
+                }
+            }
+        });
+    }
+
+    public void reconnectPool() {
+        wsBlacklist.clear();
+        failUntil.clear();
+        wsPool.stop();
+        wsPool.warmup();
+    }
+
+    public void stop() {
+        running = false;
+        paused = false;
+        try {
+            if (serverSocket != null) serverSocket.close();
+        } catch (Exception ignored) {}
         for (Socket s : activeSockets) {
             try { s.close(); } catch (Exception ignored) {}
         }
@@ -191,8 +246,7 @@ public class ProxyEngine {
             activeSockets.remove(client);
             try {
                 client.close();
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -441,14 +495,8 @@ public class ProxyEngine {
         upThread.start();
         downThread.start();
 
-        try {
-            upThread.join();
-        } catch (InterruptedException ignored) {
-        }
-        try {
-            downThread.join();
-        } catch (InterruptedException ignored) {
-        }
+        try { upThread.join(); } catch (InterruptedException ignored) {}
+        try { downThread.join(); } catch (InterruptedException ignored) {}
     }
 
     private void handlePassthrough(Socket client, InputStream in, OutputStream out, String dst, int port) throws Exception {
@@ -476,18 +524,9 @@ public class ProxyEngine {
         Thread t2 = new Thread(() -> pipe(remoteIn, out));
         t1.start();
         t2.start();
-        try {
-            t1.join();
-        } catch (InterruptedException ignored) {
-        }
-        try {
-            t2.join();
-        } catch (InterruptedException ignored) {
-        }
-        try {
-            remote.close();
-        } catch (Exception ignored) {
-        }
+        try { t1.join(); } catch (InterruptedException ignored) {}
+        try { t2.join(); } catch (InterruptedException ignored) {}
+        try { remote.close(); } catch (Exception ignored) {}
     }
 
     private void tcpFallback(Socket client, InputStream in, OutputStream out, String dst, int port, byte[] init) {
@@ -508,18 +547,9 @@ public class ProxyEngine {
             Thread t2 = new Thread(() -> pipeWithStats(remoteIn, out, false));
             t1.start();
             t2.start();
-            try {
-                t1.join();
-            } catch (InterruptedException ignored) {
-            }
-            try {
-                t2.join();
-            } catch (InterruptedException ignored) {
-            }
-            try {
-                remote.close();
-            } catch (Exception ignored) {
-            }
+            try { t1.join(); } catch (InterruptedException ignored) {}
+            try { t2.join(); } catch (InterruptedException ignored) {}
+            try { remote.close(); } catch (Exception ignored) {}
         } catch (Exception e) {
             errors.incrementAndGet();
         }
@@ -530,8 +560,7 @@ public class ProxyEngine {
         if (initForSplit != null) {
             try {
                 splitter = new MsgSplitter(initForSplit);
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
         final MsgSplitter spl = splitter;
 
@@ -587,14 +616,8 @@ public class ProxyEngine {
         upThread.start();
         downThread.start();
 
-        try {
-            upThread.join();
-        } catch (InterruptedException ignored) {
-        }
-        try {
-            downThread.join();
-        } catch (InterruptedException ignored) {
-        }
+        try { upThread.join(); } catch (InterruptedException ignored) {}
+        try { downThread.join(); } catch (InterruptedException ignored) {}
     }
 
     private void pipe(InputStream in, OutputStream out) {

@@ -146,12 +146,15 @@ public class VlessClient {
                 "Upgrade: websocket\r\n" +
                 "Connection: Upgrade\r\n" +
                 "Sec-WebSocket-Key: " + wsKey + "\r\n" +
-                "Sec-WebSocket-Version: 13\r\n" +
-                "Sec-WebSocket-Protocol: binary\r\n" +
-                "\r\n";
+                "Sec-WebSocket-Version: 13\r\n\r\n";
 
         out.write(req.getBytes("UTF-8"));
         out.flush();
+
+        String statusLine = readLine(in);
+        if (statusLine == null || !statusLine.contains("101")) {
+            throw new IOException("WebSocket handshake failed: " + statusLine);
+        }
 
         while (true) {
             String line = readLine(in);

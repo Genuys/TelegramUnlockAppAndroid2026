@@ -1,7 +1,5 @@
 package com.tgproxy.app;
 
-import android.util.Log;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -153,4 +151,7 @@ public class WsPool {
         }
         return b;
     }
+    
+    // Compatibility stub
+    public void setMobileMode(boolean m) {}
 }

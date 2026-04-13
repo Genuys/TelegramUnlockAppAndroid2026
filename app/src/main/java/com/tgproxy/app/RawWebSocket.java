@@ -96,7 +96,6 @@ public class RawWebSocket {
         StringBuilder sb = new StringBuilder();
         int statusCode = 0;
         boolean firstLine = true;
-        boolean isRedirect = false;
 
         while (true) {
             String line = readLine(ws.in);

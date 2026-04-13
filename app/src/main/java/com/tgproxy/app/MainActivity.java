@@ -13,6 +13,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -20,6 +21,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -28,20 +32,30 @@ import androidx.preference.PreferenceManager;
 
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Button btnStart, btnStop, btnQpEast, btnQpRu;
+    private Button btnStart, btnStop;
     private TextView tvStatus, tvAddress, tvPort, tvTgLink, tvPing, tvTraffic, tvUptime;
     private RadioGroup rgMode;
     private RadioButton rbOriginal, rbPython, rbVless;
     private EditText etVless, etCustomPort, etCustomIp, etTgIp;
     private LinearLayout llVless;
-    private CheckBox cbDynamicPort, cbAutostart;
+    private CheckBox cbDynamicPort, cbAutostart, cbSmartSleep;
     private Handler handler;
     private Runnable statsUpdater;
     private SharedPreferences prefs;
     private volatile boolean pingRunning = false;
+
+    private LinearLayout tabProxy, tabWarp, tabProxyList, tabDns;
+    private LinearLayout contentProxy, contentWarp, contentProxyList, contentDns;
+    private View activeTab;
+
+    private ProxyFetcher proxyFetcher;
+    private LinearLayout llProxyItems;
+    private TextView tvProxyListStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,6 +65,75 @@ public class MainActivity extends AppCompatActivity {
         prefs = PreferenceManager.getDefaultSharedPreferences(this);
         handler = new Handler(Looper.getMainLooper());
 
+        initTabs();
+        initProxyTab();
+        initWarpTab();
+        initProxyListTab();
+        initDnsTab();
+
+        requestPermissions();
+        requestBatteryOptimization();
+
+        statsUpdater = new Runnable() {
+            @Override
+            public void run() {
+                updateStats();
+                handler.postDelayed(this, 2000);
+            }
+        };
+
+        if (ProxyService.getInstance() != null) {
+            updateRunningState(true);
+        }
+
+        boolean autoOpen = prefs.getBoolean("autostart_open", false);
+        if (autoOpen && ProxyService.getInstance() == null) {
+            startProxy();
+        }
+
+        proxyFetcher = new ProxyFetcher();
+        proxyFetcher.setListener(proxies -> refreshProxyList(proxies));
+        proxyFetcher.start();
+    }
+
+    private void initTabs() {
+        tabProxy = findViewById(R.id.tab_proxy);
+        tabWarp = findViewById(R.id.tab_warp);
+        tabProxyList = findViewById(R.id.tab_proxy_list);
+        tabDns = findViewById(R.id.tab_dns);
+
+        contentProxy = findViewById(R.id.content_proxy);
+        contentWarp = findViewById(R.id.content_warp);
+        contentProxyList = findViewById(R.id.content_proxy_list);
+        contentDns = findViewById(R.id.content_dns);
+
+        activeTab = tabProxy;
+
+        tabProxy.setOnClickListener(v -> switchTab(tabProxy, contentProxy));
+        tabWarp.setOnClickListener(v -> switchTab(tabWarp, contentWarp));
+        tabProxyList.setOnClickListener(v -> switchTab(tabProxyList, contentProxyList));
+        tabDns.setOnClickListener(v -> switchTab(tabDns, contentDns));
+
+        switchTab(tabProxy, contentProxy);
+    }
+
+    private void switchTab(View tab, View content) {
+        contentProxy.setVisibility(View.GONE);
+        contentWarp.setVisibility(View.GONE);
+        contentProxyList.setVisibility(View.GONE);
+        contentDns.setVisibility(View.GONE);
+
+        tabProxy.setAlpha(0.5f);
+        tabWarp.setAlpha(0.5f);
+        tabProxyList.setAlpha(0.5f);
+        tabDns.setAlpha(0.5f);
+
+        content.setVisibility(View.VISIBLE);
+        tab.setAlpha(1.0f);
+        activeTab = tab;
+    }
+
+    private void initProxyTab() {
         btnStart = findViewById(R.id.btn_start);
         btnStop = findViewById(R.id.btn_stop);
         tvStatus = findViewById(R.id.tv_status);
@@ -68,11 +151,10 @@ public class MainActivity extends AppCompatActivity {
         llVless = findViewById(R.id.ll_vless);
         cbDynamicPort = findViewById(R.id.cb_dynamic_port);
         cbAutostart = findViewById(R.id.cb_autostart);
+        cbSmartSleep = findViewById(R.id.cb_smart_sleep);
         etCustomPort = findViewById(R.id.et_custom_port);
         etCustomIp = findViewById(R.id.et_custom_ip);
         etTgIp = findViewById(R.id.et_tg_ip);
-        btnQpEast = findViewById(R.id.btn_qp_east);
-        btnQpRu = findViewById(R.id.btn_qp_ru);
 
         int savedMode = prefs.getInt("proxy_mode", ProxyEngine.MODE_ORIGINAL);
         switch (savedMode) {
@@ -91,6 +173,22 @@ public class MainActivity extends AppCompatActivity {
         etVless.setText(prefs.getString("vless_uri", ""));
         cbDynamicPort.setChecked(prefs.getBoolean("dynamic_port", false));
         cbAutostart.setChecked(prefs.getBoolean("autostart_open", false));
+
+        // Create Animated Premium Background - More Vibrant for 'Premium' feel
+        View rootLayout = findViewById(R.id.main_root);
+        if (rootLayout != null) {
+            // Brighter shades for visibility
+            android.animation.ValueAnimator colorAnim = android.animation.ObjectAnimator.ofArgb(rootLayout, "backgroundColor", 
+                0xFF0F1721, 0xFF1E2F44, 0xFF142436, 0xFF0F1721);
+            colorAnim.setDuration(9000); // Faster duration
+            colorAnim.setEvaluator(new android.animation.ArgbEvaluator());
+            colorAnim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            colorAnim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
+            colorAnim.start();
+        }
+
+        updateRunningState(prefs.getBoolean("proxy_enabled", false));
+        cbSmartSleep.setChecked(prefs.getBoolean("smart_sleep", true));
 
         int savedPort = prefs.getInt("custom_port", 1080);
         etCustomPort.setText(String.valueOf(savedPort));
@@ -118,15 +216,11 @@ public class MainActivity extends AppCompatActivity {
                 prefs.edit().putBoolean("dynamic_port", c).apply());
         cbAutostart.setOnCheckedChangeListener((v, c) ->
                 prefs.edit().putBoolean("autostart_open", c).apply());
+        cbSmartSleep.setOnCheckedChangeListener((v, c) ->
+                prefs.edit().putBoolean("smart_sleep", c).apply());
 
         btnStart.setOnClickListener(v -> startProxy());
         btnStop.setOnClickListener(v -> stopProxy());
-        btnQpEast.setOnClickListener(v -> openQuickProxy(
-                "tg://proxy?server=peyk.acharbashi.info&port=4515" +
-                "&secret=7umk8jsddowEqNfzkSDKW25iaXNjb3R0aS55ZWt0YW5ldC5jb20"));
-        btnQpRu.setOnClickListener(v -> openQuickProxy(
-                "tg://proxy?server=wiseprox.sbrf-cdn342.ru&port=443" +
-                "&secret=000102030405060708090a0b0c0d0e0f"));
 
         setupCopyOnTap(tvAddress);
         setupCopyOnTap(tvPort);
@@ -134,52 +228,162 @@ public class MainActivity extends AppCompatActivity {
         setupCopyOnTap(tvPing);
         setupCopyOnTap(tvTraffic);
 
-        requestPermissions();
-        requestBatteryOptimization();
-
-        statsUpdater = new Runnable() {
-            @Override
-            public void run() {
-                updateStats();
-                handler.postDelayed(this, 2000);
-            }
-        };
-
-        if (ProxyService.getInstance() != null) {
-            updateRunningState(true);
-        }
-
-        boolean autoOpen = prefs.getBoolean("autostart_open", false);
-        if (autoOpen && ProxyService.getInstance() == null) {
-            startProxy();
-        }
-
         TextView tvTgChannel = findViewById(R.id.tv_tg_channel);
         TextView tvGithub = findViewById(R.id.tv_github);
         tvTgChannel.setOnClickListener(v -> openLink("https://t.me/TgUnlock2026"));
         tvGithub.setOnClickListener(v -> openLink("https://github.com/Genuys/TelegramUnlockAppAndroid2026"));
     }
 
-    private void openLink(String url) {
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)));
-        } catch (Exception ignored) {
+    private void initWarpTab() {
+        Button btnAmneziaPlay = findViewById(R.id.btn_amnezia_playstore);
+        Button btnAmneziaSite = findViewById(R.id.btn_amnezia_site);
+        Button btnInstruction = findViewById(R.id.btn_warp_instruction);
+
+        btnAmneziaPlay.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=org.amnezia.awg")));
+            } catch (Exception ignored) {}
+        });
+
+        btnAmneziaSite.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://warp-generator.github.io/")));
+            } catch (Exception ignored) {}
+        });
+
+        btnInstruction.setOnClickListener(v -> {
+            androidx.appcompat.app.AlertDialog.Builder builder = new androidx.appcompat.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert);
+            builder.setTitle("📖 Инструкция AmneziaWG");
+            builder.setMessage("1. Скачайте приложение AmneziaWG по кнопке выше.\n\n2. Откройте сайт-инструкцию для получения бесплатного или приватного WG-конфига.\n\n3. В приложении Amnezia нажмите [+] внизу экрана, выберите «Импорт из файла» или скопируйте текст в «Пользовательский туннель».\n\n4. Включите туннель — теперь ваш Телеграм работает без ограничений!");
+            builder.setPositiveButton("Понятно", null);
+            androidx.appcompat.app.AlertDialog dialog = builder.create();
+            dialog.show();
+        });
+    }
+
+    private void initProxyListTab() {
+        llProxyItems = findViewById(R.id.ll_proxy_items);
+        tvProxyListStatus = findViewById(R.id.tv_proxy_list_status);
+        Button btnRefresh = findViewById(R.id.btn_proxy_refresh);
+
+        btnRefresh.setOnClickListener(v -> {
+            tvProxyListStatus.setText("⏳ Загрузка прокси...");
+            tvProxyListStatus.setTextColor(0xFFFFAB00);
+            proxyFetcher.fetchNow();
+        });
+    }
+
+    private void refreshProxyList(List<ProxyFetcher.ProxyEntry> proxies) {
+        llProxyItems.removeAllViews();
+
+        if (proxies.isEmpty()) {
+            tvProxyListStatus.setText("❌ Прокси не найдены");
+            tvProxyListStatus.setTextColor(0xFFF44336);
+            return;
+        }
+
+        tvProxyListStatus.setText("✅ Найдено: " + proxies.size());
+        tvProxyListStatus.setTextColor(0xFF4CAF50);
+
+        int count = 1;
+        for (ProxyFetcher.ProxyEntry entry : proxies) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, 8, 0, 8);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            LinearLayout vLayout = new LinearLayout(this);
+            vLayout.setOrientation(LinearLayout.VERTICAL);
+            LinearLayout.LayoutParams vParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            vLayout.setLayoutParams(vParams);
+
+            TextView tvName = new TextView(this);
+            tvName.setTextColor(0xFF3390EC);
+            tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvName.setText("Сервер #" + (count++));
+
+            TextView tvInfo = new TextView(this);
+            tvInfo.setTextColor(0xFF888888);
+            tvInfo.setTextSize(11);
+            tvInfo.setText(entry.server + ":" + entry.port);
+
+            vLayout.addView(tvName);
+            vLayout.addView(tvInfo);
+
+            String pingStr = entry.ping >= 0 ? entry.ping + "ms" : "N/A";
+            int pingColor = entry.ping < 0 ? 0xFF888888 : entry.ping < 200 ? 0xFF4CAF50 : entry.ping < 500 ? 0xFFFFAB00 : 0xFFF44336;
+
+            TextView tvPingItem = new TextView(this);
+            tvPingItem.setTextColor(pingColor);
+            tvPingItem.setTextSize(13);
+            tvPingItem.setText(pingStr);
+            tvPingItem.setPadding(16, 0, 16, 0);
+
+            Button btnConnect = new Button(this);
+            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 80);
+            btnConnect.setLayoutParams(btnParams);
+            btnConnect.setText("➤");
+            btnConnect.setTextColor(0xFFFFFFFF);
+            btnConnect.setTextSize(14);
+            btnConnect.setBackgroundColor(0xFF3390EC);
+            btnConnect.setPadding(24, 0, 24, 0);
+            btnConnect.setOnClickListener(v -> {
+                try {
+                    Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(entry.fullLink));
+                    startActivity(i);
+                } catch (Exception e) {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setPrimaryClip(ClipData.newPlainText("proxy", entry.fullLink));
+                    Toast.makeText(this, "Скопировано", Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            row.addView(vLayout);
+            row.addView(tvPingItem);
+            row.addView(btnConnect);
+            llProxyItems.addView(row);
+
+            View divider = new View(this);
+            divider.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1));
+            divider.setBackgroundColor(0xFF333333);
+            llProxyItems.addView(divider);
         }
     }
 
-    private void openQuickProxy(String tgUrl) {
-        try {
-            Intent i = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(tgUrl));
-            startActivity(i);
-        } catch (Exception e) {
+    private void initDnsTab() {
+        Button btnDnsActivate = findViewById(R.id.btn_dns_activate);
+        TextView tvDnsInfo = findViewById(R.id.tv_dns_info);
+
+        btnDnsActivate.setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("dns", "dns.geohide.ru"));
+            Toast.makeText(this, "✅ Скопировано dns.geohide.ru!\nВставьте в поле 'Частный DNS' (Private DNS)", Toast.LENGTH_LONG).show();
+
             try {
-                String web = tgUrl
-                        .replace("tg://proxy?", "https://t.me/proxy?")
-                        .replace("tg://proxy?", "https://t.me/proxy?");
-                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(web)));
-            } catch (Exception ignored) {
+                Intent intent = new Intent(Settings.ACTION_WIRELESS_SETTINGS);
+                startActivity(intent);
+            } catch (Exception e) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_SETTINGS);
+                    startActivity(intent);
+                } catch (Exception ignored) {}
             }
-        }
+        });
+
+        Button btnDnsCopy = findViewById(R.id.btn_dns_copy);
+        btnDnsCopy.setOnClickListener(v -> {
+            ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            cm.setPrimaryClip(ClipData.newPlainText("dns", "dns.geohide.ru"));
+            Toast.makeText(this, "dns.geohide.ru скопировано!", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void openLink(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -194,16 +398,20 @@ public class MainActivity extends AppCompatActivity {
         handler.removeCallbacks(statsUpdater);
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (proxyFetcher != null) proxyFetcher.stop();
+    }
+
     private void startProxy() {
         saveSettings();
-
         Intent si = new Intent(this, ProxyService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(si);
         } else {
             startService(si);
         }
-
         handler.postDelayed(() -> updateRunningState(true), 500);
     }
 
@@ -224,8 +432,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             port = Integer.parseInt(portStr);
             if (port < 1 || port > 65535) port = 1080;
-        } catch (NumberFormatException ignored) {
-        }
+        } catch (NumberFormatException ignored) {}
         e.putInt("custom_port", port);
 
         String ip = etCustomIp.getText().toString().trim();
@@ -249,8 +456,15 @@ public class MainActivity extends AppCompatActivity {
         if (running) {
             btnStart.setEnabled(false);
             btnStop.setEnabled(true);
-            tvStatus.setText("\u2705 \u0410\u043a\u0442\u0438\u0432\u0435\u043d");
-            tvStatus.setTextColor(0xFF4CAF50);
+            ProxyService svc = ProxyService.getInstance();
+            boolean paused = svc != null && svc.isPaused();
+            if (paused) {
+                tvStatus.setText("⏸ Спящий режим");
+                tvStatus.setTextColor(0xFFFFAB00);
+            } else {
+                tvStatus.setText("✅ Активен");
+                tvStatus.setTextColor(0xFF4CAF50);
+            }
 
             if (pulseAnim == null) {
                 android.animation.PropertyValuesHolder sx = android.animation.PropertyValuesHolder.ofFloat("scaleX", 1f, 1.1f);
@@ -260,9 +474,8 @@ public class MainActivity extends AppCompatActivity {
                 pulseAnim.setRepeatCount(android.animation.ValueAnimator.INFINITE);
                 pulseAnim.setRepeatMode(android.animation.ValueAnimator.REVERSE);
             }
-            pulseAnim.start();
+            if (!paused) pulseAnim.start();
 
-            ProxyService svc = ProxyService.getInstance();
             int p = svc != null ? svc.getPort() : 1080;
             String ip = svc != null ? svc.getIp() : "127.0.0.1";
             tvAddress.setText(ip + ":" + p);
@@ -275,7 +488,7 @@ public class MainActivity extends AppCompatActivity {
             tvStatus.setScaleX(1f);
             tvStatus.setScaleY(1f);
             tvStatus.setAlpha(1f);
-            tvStatus.setText("\u274C \u041e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d");
+            tvStatus.setText("❌ Остановлен");
             tvStatus.setTextColor(0xFFF44336);
             tvAddress.setText("-");
             tvPort.setText("-");
@@ -290,6 +503,18 @@ public class MainActivity extends AppCompatActivity {
         ProxyService svc = ProxyService.getInstance();
         if (svc == null || svc.getEngine() == null) return;
 
+        if (svc.isPaused()) {
+            tvStatus.setText("⏸ Спящий режим");
+            tvStatus.setTextColor(0xFFFFAB00);
+            if (pulseAnim != null) pulseAnim.cancel();
+            tvStatus.setScaleX(1f);
+            tvStatus.setScaleY(1f);
+            return;
+        } else {
+            tvStatus.setText("✅ Активен");
+            tvStatus.setTextColor(0xFF4CAF50);
+        }
+
         int p = svc.getPort();
         String ip = svc.getIp();
         if (!tvPort.getText().toString().equals("-") && !tvAddress.getText().toString().equals(ip + ":" + p)) {
@@ -301,8 +526,8 @@ public class MainActivity extends AppCompatActivity {
         ProxyEngine eng = svc.getEngine();
         long up = eng.bytesUp.get();
         long down = eng.bytesDown.get();
-        tvTraffic.setText("\u2191 " + TgConstants.humanBytes(up) +
-                "  \u2193 " + TgConstants.humanBytes(down));
+        tvTraffic.setText("↑ " + TgConstants.humanBytes(up) +
+                "  ↓ " + TgConstants.humanBytes(down));
 
         if (tvUptime != null) {
             long secs = svc.getUptime() / 1000;
@@ -310,80 +535,12 @@ public class MainActivity extends AppCompatActivity {
             tvUptime.setText(timeStr);
         }
 
+        String netType = svc.isMobileNetwork() ? " 📱" : " 📶";
         svc.updateNotification(svc.getIp() + ":" + svc.getPort() +
-                " | \u2191" + TgConstants.humanBytes(up) +
-                " \u2193" + TgConstants.humanBytes(down));
-
-        if (!pingRunning) {
-            pingRunning = true;
-            new Thread(() -> {
-                try {
-                    String tgIp = prefs.getString("tg_ping_ip", "149.154.167.220");
-                    int proxyPort = svc.getPort();
-                    String proxyIp = svc.getIp();
-                    long start = System.currentTimeMillis();
-                    Socket s = new Socket();
-                    s.connect(new InetSocketAddress(proxyIp, proxyPort), 3000);
-                    s.setSoTimeout(3000);
-                    s.setTcpNoDelay(true);
-
-                    java.io.OutputStream out = s.getOutputStream();
-                    java.io.InputStream in = s.getInputStream();
-
-                    byte[] tgIpBytes;
-                    try {
-                        tgIpBytes = java.net.InetAddress.getByName(tgIp).getAddress();
-                    } catch (Exception ex) {
-                        tgIpBytes = new byte[]{(byte)149, (byte)154, (byte)167, (byte)220};
-                    }
-
-                    out.write(new byte[]{0x05, 0x01, 0x00});
-                    out.flush();
-                    byte[] authResp = new byte[2];
-                    int ar = 0;
-                    while (ar < 2) {
-                        int r = in.read(authResp, ar, 2 - ar);
-                        if (r == -1) throw new java.io.IOException("EOF");
-                        ar += r;
-                    }
-
-                    byte[] req = new byte[10];
-                    req[0] = 0x05;
-                    req[1] = 0x01;
-                    req[2] = 0x00;
-                    req[3] = 0x01;
-                    req[4] = tgIpBytes[0];
-                    req[5] = tgIpBytes[1];
-                    req[6] = tgIpBytes[2];
-                    req[7] = tgIpBytes[3];
-                    req[8] = (byte)(443 >> 8);
-                    req[9] = (byte)(443 & 0xFF);
-                    out.write(req);
-                    out.flush();
-
-                    byte[] resp = new byte[10];
-                    int rr = 0;
-                    while (rr < 10) {
-                        int r = in.read(resp, rr, 10 - rr);
-                        if (r == -1) throw new java.io.IOException("EOF");
-                        rr += r;
-                    }
-
-                    long elapsed = System.currentTimeMillis() - start;
-                    s.close();
-
-                    if (resp[1] == 0x00) {
-                        handler.post(() -> tvPing.setText(elapsed + " ms"));
-                    } else {
-                        handler.post(() -> tvPing.setText("err"));
-                    }
-                } catch (Exception e) {
-                    handler.post(() -> tvPing.setText("err"));
-                } finally {
-                    pingRunning = false;
-                }
-            }).start();
-        }
+                " | ↑" + TgConstants.humanBytes(up) +
+                " ↓" + TgConstants.humanBytes(down) + netType);
+        
+        tvPing.setText("-");
     }
 
     private void setupTgLinkTap(TextView tv) {
@@ -391,11 +548,11 @@ public class MainActivity extends AppCompatActivity {
             String text = tv.getText().toString();
             if (text.equals("-")) return;
             try {
-                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(text)));
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(text)));
             } catch (Exception e) {
                 ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
-                Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Скопировано", Toast.LENGTH_SHORT).show();
             }
         });
         tv.setOnLongClickListener(v -> {
@@ -403,7 +560,7 @@ public class MainActivity extends AppCompatActivity {
             if (text.equals("-")) return false;
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
-            Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Скопировано", Toast.LENGTH_SHORT).show();
             return true;
         });
     }
@@ -414,7 +571,7 @@ public class MainActivity extends AppCompatActivity {
             if (text.equals("-")) return;
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             cm.setPrimaryClip(ClipData.newPlainText("proxy", text));
-            Toast.makeText(this, "\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u043e", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Скопировано", Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -435,8 +592,7 @@ public class MainActivity extends AppCompatActivity {
                 intent.setData(Uri.parse("package:" + getPackageName()));
                 try {
                     startActivity(intent);
-                } catch (Exception ignored) {
-                }
+                } catch (Exception ignored) {}
             }
         }
     }
