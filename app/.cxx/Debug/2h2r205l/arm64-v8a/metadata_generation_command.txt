@@ -1,0 +1,19 @@
+                        -HC:\XONE\TelegramUnlockAppAndroid2026-main\app\src\main\cpp
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=21
+-DANDROID_PLATFORM=android-21
+-DANDROID_ABI=arm64-v8a
+-DCMAKE_ANDROID_ARCH_ABI=arm64-v8a
+-DANDROID_NDK=C:\Users\anime\AppData\Local\Android\Sdk\ndk\25.1.8937393
+-DCMAKE_ANDROID_NDK=C:\Users\anime\AppData\Local\Android\Sdk\ndk\25.1.8937393
+-DCMAKE_TOOLCHAIN_FILE=C:\Users\anime\AppData\Local\Android\Sdk\ndk\25.1.8937393\build\cmake\android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=C:\Users\anime\AppData\Local\Android\Sdk\cmake\3.22.1\bin\ninja.exe
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=C:\XONE\TelegramUnlockAppAndroid2026-main\app\build\intermediates\cxx\Debug\2h2r205l\obj\arm64-v8a
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=C:\XONE\TelegramUnlockAppAndroid2026-main\app\build\intermediates\cxx\Debug\2h2r205l\obj\arm64-v8a
+-DCMAKE_BUILD_TYPE=Debug
+-BC:\XONE\TelegramUnlockAppAndroid2026-main\app\.cxx\Debug\2h2r205l\arm64-v8a
+-GNinja
+-DANDROID_STL=none
+                        Build command args: []
+                        Version: 2

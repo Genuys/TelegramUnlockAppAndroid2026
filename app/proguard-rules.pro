@@ -1,0 +1,5 @@
+-keep class com.tgproxy.app.** { *; }
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable

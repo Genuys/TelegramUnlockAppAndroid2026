@@ -1,0 +1,5 @@
+#!/sbin/sh
+SKIPUNZIP=1
+unzip -o "$ZIPFILE" 'system/*' -d "$MODPATH" >&2
+unzip -o "$ZIPFILE" 'service.sh' -d "$MODPATH" >&2
+chmod 755 "$MODPATH/service.sh"

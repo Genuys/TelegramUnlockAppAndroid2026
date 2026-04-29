@@ -1,0 +1,766 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0F1721">
+
+<LinearLayout
+    android:id="@+id/main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp">
+
+        <View android:layout_width="40dp" android:layout_height="40dp"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="TG Proxy"
+            android:textColor="#3390EC"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_settings"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:gravity="center"
+            android:text="⚙️"
+            android:textSize="22sp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackgroundBorderless"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/card_bg" android:tag="card"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <LinearLayout android:id="@+id/tab_proxy"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⚡ Прокси" android:textColor="#E0E0E0"
+                android:textSize="12sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <View android:layout_width="1dp" android:layout_height="24dp" android:background="#333333"/>
+
+        <LinearLayout android:id="@+id/tab_warp"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🔑 WARP" android:textColor="#E0E0E0"
+                android:textSize="12sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <View android:layout_width="1dp" android:layout_height="24dp" android:background="#333333"/>
+
+        <LinearLayout android:id="@+id/tab_proxy_list"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📋 Список" android:textColor="#E0E0E0"
+                android:textSize="12sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+        <View android:layout_width="1dp" android:layout_height="24dp" android:background="#333333"/>
+
+        <LinearLayout android:id="@+id/tab_dns"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:clickable="true" android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🌐 DNS" android:textColor="#E0E0E0"
+                android:textSize="12sp" android:textStyle="bold"/>
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <!-- ======== TAB: PROXY ======== -->
+            <LinearLayout android:id="@+id/content_proxy"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp"
+                android:visibility="visible">
+
+                <TextView android:id="@+id/tv_status"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_gravity="center" android:layout_marginTop="4dp"
+                    android:text="❌ Остановлен" android:textColor="#F44336"
+                    android:textSize="18sp" android:textStyle="bold"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button android:id="@+id/btn_start"
+                        android:layout_width="0dp" android:layout_height="48dp"
+                        android:layout_marginEnd="6dp" android:layout_weight="1"
+                        android:background="@drawable/btn_start_bg"
+                        android:text="Запустить" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold"/>
+
+                    <Button android:id="@+id/btn_stop"
+                        android:layout_width="0dp" android:layout_height="48dp"
+                        android:layout_marginStart="6dp" android:layout_weight="1"
+                        android:background="@drawable/btn_stop_bg"
+                        android:enabled="false" android:text="Остановить"
+                        android:textAllCaps="false" android:textColor="#FFFFFF"
+                        android:textSize="15sp" android:textStyle="bold"/>
+                </LinearLayout>
+
+                <!-- Info card -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:id="@+id/tv_info_title" android:text="Информация" android:textColor="#3390EC"
+                        android:textSize="13sp" android:textStyle="bold"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:id="@+id/tv_label_addr" android:text="Адрес"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tv_address"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="-" android:textColor="#E0E0E0"
+                        android:textSize="15sp" android:textStyle="bold"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:id="@+id/tv_label_port" android:layout_marginTop="6dp" android:text="Порт"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tv_port"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="-" android:textColor="#E0E0E0"
+                        android:textSize="15sp" android:textStyle="bold"/>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:id="@+id/tv_label_tglink" android:layout_marginTop="6dp" android:text="Ссылка для Telegram"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tv_tg_link"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:text="-" android:textColor="#3390EC" android:textSize="13sp"
+                        android:ellipsize="end" android:maxLines="2"
+                        android:clickable="true"
+                        android:foreground="?android:attr/selectableItemBackground"/>
+
+                    <LinearLayout android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:id="@+id/tv_label_ping" android:text="Пинг" android:textColor="#888888" android:textSize="11sp"/>
+                            <TextView android:id="@+id/tv_ping"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="-" android:textColor="#E0E0E0"
+                                android:textSize="15sp" android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:id="@+id/tv_label_traffic" android:text="Трафик" android:textColor="#888888" android:textSize="11sp"/>
+                            <TextView android:id="@+id/tv_traffic"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="-" android:textColor="#E0E0E0"
+                                android:textSize="14sp" android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                            android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:id="@+id/tv_label_uptime" android:text="Аптайм" android:textColor="#888888" android:textSize="11sp"/>
+                            <TextView android:id="@+id/tv_uptime"
+                                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                                android:text="00:00:00" android:textColor="#E0E0E0"
+                                android:textSize="14sp" android:textStyle="bold"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <Button android:id="@+id/btn_ping_now"
+                        android:layout_width="match_parent" android:layout_height="36dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/btn_start_bg"
+                        android:text="🔍 Измерить пинг" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="12sp"/>
+                </LinearLayout>
+
+                <!-- Mode card -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:id="@+id/tv_mode_title" android:text="Режим работы" android:textColor="#3390EC"
+                        android:textSize="13sp" android:textStyle="bold"/>
+
+                    <RadioGroup android:id="@+id/rg_mode"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp">
+
+                        <RadioButton android:id="@+id/rb_original"
+                            android:layout_width="wrap_content" android:layout_height="36dp"
+                            android:buttonTint="#3390EC" android:checked="true"
+                            android:text="Оригинал" android:textColor="#E0E0E0" android:textSize="14sp"/>
+
+                        <RadioButton android:id="@+id/rb_python"
+                            android:layout_width="wrap_content" android:layout_height="36dp"
+                            android:buttonTint="#3390EC"
+                            android:text="Python-обходник" android:textColor="#E0E0E0" android:textSize="14sp"/>
+
+                        <RadioButton android:id="@+id/rb_vless"
+                            android:layout_width="wrap_content" android:layout_height="36dp"
+                            android:buttonTint="#3390EC"
+                            android:text="VLESS" android:textColor="#E0E0E0" android:textSize="14sp"/>
+                    </RadioGroup>
+
+                    <LinearLayout android:id="@+id/ll_vless"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp" android:orientation="vertical"
+                        android:visibility="gone">
+                        <EditText android:id="@+id/et_vless"
+                            android:layout_width="match_parent" android:layout_height="40dp"
+                            android:background="@drawable/edit_bg"
+                            android:hint="vless://UUID@host:port?security=tls&amp;sni=..."
+                            android:inputType="textUri" android:paddingStart="10dp"
+                            android:paddingEnd="10dp" android:singleLine="true"
+                            android:textColor="#E0E0E0" android:textColorHint="#555555"
+                            android:textSize="12sp"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Settings card -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:id="@+id/tv_settings_card_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Настройки" android:textColor="#3390EC"
+                        android:textSize="13sp" android:textStyle="bold"/>
+
+                    <CheckBox android:id="@+id/cb_dynamic_port"
+                        android:layout_width="wrap_content" android:layout_height="36dp"
+                        android:buttonTint="#3390EC" android:text="Динамический порт"
+                        android:textColor="#E0E0E0" android:textSize="14sp"/>
+
+                    <CheckBox android:id="@+id/cb_autostart"
+                        android:layout_width="wrap_content" android:layout_height="36dp"
+                        android:buttonTint="#3390EC" android:text="Автозапуск при открытии"
+                        android:textColor="#E0E0E0" android:textSize="14sp"/>
+
+                    <CheckBox android:id="@+id/cb_smart_sleep"
+                        android:layout_width="wrap_content" android:layout_height="36dp"
+                        android:buttonTint="#3390EC" android:checked="true"
+                        android:text="Умный сон (экономия батареи)"
+                        android:textColor="#E0E0E0" android:textSize="14sp"/>
+
+                    <TextView android:id="@+id/tv_label_proxy_port"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="Порт прокси (1–65535)"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <EditText android:id="@+id/et_custom_port"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:layout_marginTop="4dp" android:background="@drawable/edit_bg"
+                        android:hint="1080" android:inputType="number"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:singleLine="true" android:textColor="#E0E0E0"
+                        android:textColorHint="#555555" android:textSize="13sp"/>
+
+                    <TextView android:id="@+id/tv_label_proxy_ip"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="IP локального прокси"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <EditText android:id="@+id/et_custom_ip"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:layout_marginTop="4dp" android:background="@drawable/edit_bg"
+                        android:hint="127.0.0.1" android:inputType="textUri"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:singleLine="true" android:textColor="#E0E0E0"
+                        android:textColorHint="#555555" android:textSize="13sp"/>
+
+                    <TextView android:id="@+id/tv_label_tg_dc"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="IP Telegram DC (для пинга)"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <EditText android:id="@+id/et_tg_ip"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:layout_marginTop="4dp" android:background="@drawable/edit_bg"
+                        android:hint="149.154.167.220" android:inputType="textUri"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:singleLine="true" android:textColor="#E0E0E0"
+                        android:textColorHint="#555555" android:textSize="13sp"/>
+                </LinearLayout>
+
+                <!-- SOCKS5 Auth card -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:id="@+id/tv_socks5_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🔒 Защита SOCKS5 (опционально)"
+                        android:textColor="#3390EC" android:textSize="13sp" android:textStyle="bold"/>
+
+                    <TextView android:id="@+id/tv_socks5_desc"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Логин и пароль для доступа к прокси. Оставьте пустым — авторизация отключена."
+                        android:textColor="#888888" android:textSize="11sp"/>
+
+                    <TextView android:id="@+id/tv_label_login"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="Логин"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <EditText android:id="@+id/et_socks5_user"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:layout_marginTop="4dp" android:background="@drawable/edit_bg"
+                        android:hint="username" android:inputType="text"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:singleLine="true" android:textColor="#E0E0E0"
+                        android:textColorHint="#555555" android:textSize="13sp"/>
+
+                    <TextView android:id="@+id/tv_label_password"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:text="Пароль"
+                        android:textColor="#888888" android:textSize="11sp"/>
+                    <EditText android:id="@+id/et_socks5_pass"
+                        android:layout_width="match_parent" android:layout_height="40dp"
+                        android:layout_marginTop="4dp" android:background="@drawable/edit_bg"
+                        android:hint="••••••••" android:inputType="textPassword"
+                        android:paddingStart="10dp" android:paddingEnd="10dp"
+                        android:singleLine="true" android:textColor="#E0E0E0"
+                        android:textColorHint="#555555" android:textSize="13sp"/>
+                </LinearLayout>
+
+                <!-- About card -->
+                <LinearLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="14dp">
+
+                    <TextView android:id="@+id/tv_about_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="О разработчике" android:textColor="#3390EC"
+                        android:textSize="13sp" android:textStyle="bold"/>
+
+                    <TextView android:id="@+id/tv_tg_channel"
+                        android:layout_width="match_parent" android:layout_height="36dp"
+                        android:layout_marginTop="6dp" android:gravity="center_vertical"
+                        android:text="✈️ Telegram: @TgUnlock2026" android:textColor="#E0E0E0"
+                        android:textSize="13sp" android:clickable="true"
+                        android:foreground="?android:attr/selectableItemBackground"/>
+
+                    <TextView android:id="@+id/tv_github"
+                        android:layout_width="match_parent" android:layout_height="36dp"
+                        android:gravity="center_vertical"
+                        android:text="⭐ GitHub: Genuys" android:textColor="#E0E0E0"
+                        android:textSize="13sp" android:clickable="true"
+                        android:foreground="?android:attr/selectableItemBackground"/>
+                </LinearLayout>
+
+                <View android:layout_width="1dp" android:layout_height="16dp"/>
+
+            </LinearLayout>
+
+            <!-- ======== TAB: WARP ======== -->
+            <LinearLayout android:id="@+id/content_warp"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="14dp" android:visibility="gone">
+
+                <!-- Header -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:layout_marginBottom="12dp">
+                    <TextView android:id="@+id/tv_warp_title"
+                        android:layout_width="0dp" android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="🔑 WARP-туннель"
+                        android:textColor="#3390EC" android:textSize="18sp" android:textStyle="bold"/>
+                    <TextView android:id="@+id/tv_warp_status"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="Ожидание..." android:textColor="#FFAB00"
+                        android:textSize="11sp" android:maxLines="2" android:gravity="end"/>
+                </LinearLayout>
+
+                <!-- Get config -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="14dp" android:layout_marginBottom="10dp">
+
+                    <Button android:id="@+id/btn_warp_vpgram"
+                        android:layout_width="match_parent" android:layout_height="56dp"
+                        android:background="@drawable/btn_start_bg"
+                        android:text="⬇️ Получить конфиг" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold"/>
+                </LinearLayout>
+
+                <!-- Config viewer -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="12dp" android:layout_marginBottom="10dp">
+
+                    <TextView android:id="@+id/tv_warp_config_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="📄 Конфиг" android:textColor="#3390EC"
+                        android:textSize="12sp" android:textStyle="bold"
+                        android:layout_marginBottom="8dp"/>
+
+                    <ScrollView android:layout_width="match_parent" android:layout_height="140dp"
+                        android:background="#FF0D1117">
+                        <TextView android:id="@+id/tv_warp_config"
+                            android:layout_width="match_parent" android:layout_height="wrap_content"
+                            android:padding="10dp" android:text="Конфиг появится здесь..."
+                            android:textColor="#4CAF50" android:textSize="10sp"
+                            android:fontFamily="monospace"/>
+                    </ScrollView>
+
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp" android:orientation="horizontal" android:weightSum="2">
+                        <Button android:id="@+id/btn_warp_copy"
+                            android:layout_width="0dp" android:layout_height="44dp"
+                            android:layout_weight="1" android:layout_marginEnd="5dp"
+                            android:background="@drawable/btn_start_bg"
+                            android:text="📋 Копировать" android:textAllCaps="false"
+                            android:textColor="#FFFFFF" android:textSize="12sp"/>
+                        <Button android:id="@+id/btn_warp_open"
+                            android:layout_width="0dp" android:layout_height="44dp"
+                            android:layout_weight="1" android:layout_marginStart="5dp"
+                            android:background="#FF388E3C"
+                            android:text="📤 Поделиться" android:textAllCaps="false"
+                            android:textColor="#FFFFFF" android:textSize="12sp"/>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Auth fields -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="14dp" android:layout_marginBottom="10dp">
+
+                    <TextView android:id="@+id/tv_warp_auth_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🔐 Авторизация (необязательно)"
+                        android:textColor="#3390EC" android:textSize="12sp" android:textStyle="bold"
+                        android:layout_marginBottom="10dp"/>
+
+                    <EditText android:id="@+id/et_warp_user"
+                        android:layout_width="match_parent" android:layout_height="44dp"
+                        android:hint="Логин" android:inputType="text"
+                        android:textColor="#FFFFFF" android:textColorHint="#555555"
+                        android:background="@drawable/input_bg" android:paddingStart="12dp"
+                        android:paddingEnd="12dp" android:textSize="13sp"
+                        android:layout_marginBottom="8dp"/>
+
+                    <EditText android:id="@+id/et_warp_pass"
+                        android:layout_width="match_parent" android:layout_height="44dp"
+                        android:hint="Пароль" android:inputType="textPassword"
+                        android:textColor="#FFFFFF" android:textColorHint="#555555"
+                        android:background="@drawable/input_bg" android:paddingStart="12dp"
+                        android:paddingEnd="12dp" android:textSize="13sp"/>
+                </LinearLayout>
+
+                <!-- Local proxy control -->
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="14dp" android:layout_marginBottom="10dp">
+
+                    <TextView android:id="@+id/tv_warp_proxy_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🚀 Локальный прокси"
+                        android:textColor="#9C27B0" android:textSize="13sp" android:textStyle="bold"
+                        android:layout_marginBottom="6dp"/>
+
+                    <TextView android:id="@+id/tv_warp_proxy_status"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp" android:gravity="center"
+                        android:text="● Загрузите конфиг для активации"
+                        android:textColor="#888888" android:textSize="11sp" android:textStyle="bold"/>
+
+                    <TextView android:id="@+id/tv_warp_lib_progress"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginBottom="8dp" android:gravity="center"
+                        android:visibility="gone" android:text=""
+                        android:textColor="#FFAB00" android:textSize="11sp"/>
+
+                    <Button android:id="@+id/btn_warp_proxy_start"
+                        android:layout_width="match_parent" android:layout_height="52dp"
+                        android:background="#FF9C27B0"
+                        android:text="▶ Запустить" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"
+                        android:enabled="false"/>
+
+                    <Button android:id="@+id/btn_warp_proxy_stop"
+                        android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_marginTop="6dp" android:background="#FF444444"
+                        android:enabled="false"
+                        android:text="■ Остановить" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="13sp"/>
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="SOCKS5: 127.0.0.1 : 2337"
+                        android:textColor="#555555" android:textSize="10sp"
+                        android:gravity="center" android:fontFamily="monospace"/>
+                </LinearLayout>
+
+                <!-- Download AWG -->
+                <Button android:id="@+id/btn_amnezia_playstore"
+                    android:layout_width="match_parent" android:layout_height="44dp"
+                    android:background="@drawable/btn_start_bg"
+                    android:text="📥 Установить AmneziaWG" android:textAllCaps="false"
+                    android:textColor="#FFFFFF" android:textSize="12sp"/>
+
+            </LinearLayout>
+
+            <!-- ======== TAB: PROXY LIST ======== -->
+            <LinearLayout android:id="@+id/content_proxy_list"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView android:id="@+id/tv_proxy_list_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="📋 Высокоскоростные сервера" android:textColor="#3390EC"
+                        android:textSize="16sp" android:textStyle="bold"/>
+
+                    <View android:layout_width="match_parent" android:layout_height="4dp"/>
+
+                    <Button android:id="@+id/btn_proxy_refresh"
+                        android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_marginTop="10dp" android:background="@drawable/btn_start_bg"
+                        android:text="🔄 Обновить прокси" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"/>
+
+                    <TextView android:id="@+id/tv_proxy_list_status"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_gravity="center" android:layout_marginTop="8dp"
+                        android:text="⏳ Загрузка..." android:textColor="#FFAB00"
+                        android:textSize="13sp"/>
+                </LinearLayout>
+
+                <LinearLayout android:id="@+id/ll_proxy_items"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:background="@drawable/card_bg" android:tag="card"
+                    android:orientation="vertical" android:padding="12dp"/>
+            </LinearLayout>
+
+            <!-- ======== TAB: DNS ======== -->
+            <LinearLayout android:id="@+id/content_dns"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:padding="16dp" android:visibility="gone">
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg" android:tag="card" android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView android:id="@+id/tv_dns_title"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="🌐 DNS unlock ИИ и игр" android:textColor="#3390EC"
+                        android:textSize="16sp" android:textStyle="bold"/>
+
+                    <TextView android:id="@+id/tv_dns_info"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="GeoHide DNS — специальный DNS-сервер который разблокирует:\n\n🤖 ChatGPT, Claude, Gemini и другие ИИ\n🎮 Игровые сервисы, Discord\n📱 Социальные сети\n🌍 Заблокированные сайты\n\nДля активации установите Private DNS в настройках Android.\n\nАдрес: dns.geohide.ru"
+                        android:textColor="#B0B0B0" android:textSize="13sp"
+                        android:lineSpacingExtra="3dp"/>
+
+                    <Button android:id="@+id/btn_dns_activate"
+                        android:layout_width="match_parent" android:layout_height="48dp"
+                        android:layout_marginTop="16dp" android:background="@drawable/btn_start_bg"
+                        android:text="⚙️ Открыть настройки DNS" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold"/>
+
+                    <Button android:id="@+id/btn_dns_copy"
+                        android:layout_width="match_parent" android:layout_height="44dp"
+                        android:layout_marginTop="8dp" android:background="@drawable/btn_stop_bg"
+                        android:text="📋 Скопировать dns.geohide.ru" android:textAllCaps="false"
+                        android:textColor="#FFFFFF" android:textSize="14sp"/>
+
+                    <TextView android:id="@+id/tv_dns_instruction"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Инструкция:\n1. Нажмите «Открыть настройки DNS»\n2. Перейдите в раздел Private DNS\n3. Выберите «Имя хоста провайдера»\n4. Введите: dns.geohide.ru\n5. Сохраните"
+                        android:textColor="#666666" android:textSize="12sp"
+                        android:lineSpacingExtra="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+        </FrameLayout>
+    </ScrollView>
+
+</LinearLayout>
+
+<FrameLayout
+    android:id="@+id/overlay_settings"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#AA000000"
+    android:visibility="gone"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="290dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/card_bg" android:tag="card"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+            <TextView
+                android:id="@+id/tv_settings_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="u2699uFE0F Nastrojki"
+                android:textColor="#3390EC"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/btn_settings_close"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:gravity="center"
+                android:text="u2715"
+                android:textColor="#888888"
+                android:textSize="18sp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackgroundBorderless"/>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:layout_marginTop="14dp" android:layout_marginBottom="14dp"
+            android:background="#2A2A2A"/>
+
+        <TextView
+            android:id="@+id/tv_label_lang"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="uD83CuDF0D Jazyk"
+            android:textColor="#888888"
+            android:textSize="11sp"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:orientation="horizontal"
+            android:background="@drawable/input_bg">
+
+            <TextView android:id="@+id/btn_lang_ru"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:gravity="center"
+                android:text="uD83CuDDF7uD83CuDDFA Russkij"
+                android:textColor="#E0E0E0" android:textSize="13sp" android:textStyle="bold"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"/>
+
+            <View android:layout_width="1dp" android:layout_height="match_parent"
+                android:background="#333333"/>
+
+            <TextView android:id="@+id/btn_lang_en"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:gravity="center"
+                android:text="uD83CuDDECuD83CuDDE7 English"
+                android:textColor="#555555" android:textSize="13sp"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_label_theme"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="uD83CuDFA8 Tema"
+            android:textColor="#888888"
+            android:textSize="11sp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:orientation="horizontal"
+            android:background="@drawable/input_bg">
+
+            <TextView android:id="@+id/btn_theme_dark"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:gravity="center"
+                android:text="uD83CuDF11 Tyomnaya"
+                android:textColor="#E0E0E0" android:textSize="13sp" android:textStyle="bold"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"/>
+
+            <View android:layout_width="1dp" android:layout_height="match_parent"
+                android:background="#333333"/>
+
+            <TextView android:id="@+id/btn_theme_light"
+                android:layout_width="0dp" android:layout_height="match_parent"
+                android:layout_weight="1" android:gravity="center"
+                android:text="u2600uFE0F Svetlaya"
+                android:textColor="#555555" android:textSize="13sp"
+                android:clickable="true" android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</FrameLayout>
+
+<com.tgproxy.app.SnowfallView
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:importantForAccessibility="no"
+    android:clickable="false"
+    android:focusable="false"/>
+
+</FrameLayout>

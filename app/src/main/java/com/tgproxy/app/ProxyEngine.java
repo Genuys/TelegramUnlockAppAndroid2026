@@ -1,0 +1,610 @@
+package com.tgproxy.app;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
+
+public class ProxyEngine {
+
+    public static final int MODE_ORIGINAL = 1;
+    public static final int MODE_PYTHON   = 2;
+    public static final int MODE_VLESS    = 3;
+
+    private volatile boolean running = false;
+    private volatile boolean paused  = false;
+    private ServerSocket serverSocket;
+    private ExecutorService pool;
+    private int mode = MODE_ORIGINAL;
+    private String vlessUri = "";
+
+    private volatile String socks5User     = null;
+    private volatile String socks5PassHash = null;
+
+    private final WsPool wsPool = new WsPool();
+
+    public final AtomicLong bytesUp    = new AtomicLong(0);
+    public final AtomicLong bytesDown  = new AtomicLong(0);
+    public final AtomicLong connTotal  = new AtomicLong(0);
+    public final AtomicLong connWs     = new AtomicLong(0);
+    public final AtomicLong connTcp    = new AtomicLong(0);
+    public final AtomicLong errors     = new AtomicLong(0);
+
+    private final Set<String> wsBlacklist = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, Long> failUntil = new ConcurrentHashMap<>();
+    private final Set<Socket> activeSockets = ConcurrentHashMap.newKeySet();
+
+    private OnStatsListener statsListener;
+
+    public interface OnStatsListener {
+        void onStats(long up, long down, long total);
+    }
+
+    public void setStatsListener(OnStatsListener l)     { this.statsListener = l; }
+    public void setMode(int m)                          { this.mode = m; }
+    public void setVlessUri(String uri)                 { this.vlessUri = uri; }
+    public int  getMode()                               { return mode; }
+
+    public void setCredentials(String user, String passHash) {
+        this.socks5User     = (user != null && !user.isEmpty()) ? user : null;
+        this.socks5PassHash = (passHash != null && !passHash.isEmpty()) ? passHash : null;
+    }
+
+    public volatile String boundIp = "127.0.0.1";
+
+    public void setBoundIp(String ip) {
+        this.boundIp = (ip != null && !ip.trim().isEmpty()) ? ip.trim() : "127.0.0.1";
+    }
+
+    public void setMobileMode(boolean mobile) {}
+    public boolean isMobileMode() { return false; }
+
+    public void start(int port) throws IOException {
+        if (running) return;
+        running = true;
+        paused  = false;
+
+        serverSocket = new ServerSocket();
+        serverSocket.setReuseAddress(true);
+        try {
+            serverSocket.bind(new InetSocketAddress(boundIp, port));
+        } catch (Exception e) {
+            boundIp = "127.0.0.1";
+            serverSocket.bind(new InetSocketAddress(boundIp, port));
+        }
+
+        pool = Executors.newCachedThreadPool();
+        wsPool.warmup();
+        acceptLoop();
+    }
+
+    public void pause() {
+        paused = true;
+        closeServerSocket();
+        wsPool.stop();
+        drainActiveSockets();
+    }
+
+    public void resume(int port) throws IOException {
+        if (!running) return;
+        paused = false;
+
+        serverSocket = new ServerSocket();
+        serverSocket.setReuseAddress(true);
+        serverSocket.bind(new InetSocketAddress(boundIp, port));
+
+        wsPool.restart();
+        if (pool == null || pool.isShutdown()) pool = Executors.newCachedThreadPool();
+        acceptLoop();
+    }
+
+    public void reconnectPool() {
+        wsBlacklist.clear();
+        failUntil.clear();
+        wsPool.restart();
+    }
+
+    public void stop() {
+        running = false;
+        paused  = false;
+        closeServerSocket();
+        drainActiveSockets();
+        if (pool != null) pool.shutdownNow();
+        pool = null;
+        wsPool.stop();
+    }
+
+    public boolean isRunning() { return running; }
+
+    private void acceptLoop() {
+        pool.submit(() -> {
+            while (running && !paused && !serverSocket.isClosed()) {
+                try {
+                    Socket client = serverSocket.accept();
+                    client.setTcpNoDelay(true);
+                    connTotal.incrementAndGet();
+                    pool.submit(() -> handleClient(client));
+                } catch (Exception e) {
+                    if (running && !paused) errors.incrementAndGet();
+                }
+            }
+        });
+    }
+
+    private void closeServerSocket() {
+        try { if (serverSocket != null) serverSocket.close(); } catch (Exception ignored) {}
+    }
+
+    private void drainActiveSockets() {
+        for (Socket s : activeSockets) try { s.close(); } catch (Exception ignored) {}
+        activeSockets.clear();
+    }
+
+    private void handleClient(Socket client) {
+        activeSockets.add(client);
+        try {
+            client.setReceiveBufferSize(524288);
+            client.setSendBufferSize(524288);
+            client.setTcpNoDelay(true);
+            client.setKeepAlive(true);
+
+            InputStream  in  = client.getInputStream();
+            OutputStream out = client.getOutputStream();
+
+            // --- SOCKS5 greeting ---
+            byte[] hdr = readExactly(in, 2);
+            if (hdr[0] != 5) { client.close(); return; }
+            int nmethods = hdr[1] & 0xFF;
+            byte[] methods = readExactly(in, nmethods);
+
+            if (!doSocks5Auth(in, out, methods)) {
+                client.close();
+                return;
+            }
+
+            // --- SOCKS5 request ---
+            byte[] req  = readExactly(in, 4);
+            int cmd  = req[1] & 0xFF;
+            int atyp = req[3] & 0xFF;
+
+            if (cmd != 1) {
+                out.write(socks5Reply(7)); out.flush(); client.close(); return;
+            }
+
+            String dst;
+            if (atyp == 1) {
+                byte[] addr = readExactly(in, 4);
+                dst = (addr[0] & 0xFF) + "." + (addr[1] & 0xFF) + "."
+                    + (addr[2] & 0xFF) + "." + (addr[3] & 0xFF);
+            } else if (atyp == 3) {
+                int dlen = readExactly(in, 1)[0] & 0xFF;
+                dst = new String(readExactly(in, dlen), "UTF-8");
+            } else if (atyp == 4) {
+                byte[] addr = readExactly(in, 16);
+                dst = java.net.InetAddress.getByAddress(addr).getHostAddress();
+            } else {
+                out.write(socks5Reply(8)); out.flush(); client.close(); return;
+            }
+
+            byte[] portBytes = readExactly(in, 2);
+            int port = ((portBytes[0] & 0xFF) << 8) | (portBytes[1] & 0xFF);
+
+            switch (mode) {
+                case MODE_VLESS:   handleVless(client, in, out, dst, port);    break;
+                case MODE_PYTHON:  handlePython(client, in, out, dst, port);   break;
+                default:           handleOriginal(client, in, out, dst, port); break;
+            }
+        } catch (Exception e) {
+            errors.incrementAndGet();
+        } finally {
+            activeSockets.remove(client);
+            try { client.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * RFC 1929 SOCKS5 username/password subnegotiation.
+     * Returns true if authentication passed (or is not required).
+     */
+    private boolean doSocks5Auth(InputStream in, OutputStream out, byte[] methods) throws IOException {
+        if (socks5User == null) {
+            out.write(new byte[]{5, 0}); out.flush();
+            return true;
+        }
+
+        boolean supportsUserPass = false;
+        for (byte m : methods) if ((m & 0xFF) == 2) { supportsUserPass = true; break; }
+
+        if (!supportsUserPass) {
+            out.write(new byte[]{5, (byte) 0xFF}); out.flush();
+            return false;
+        }
+
+        out.write(new byte[]{5, 2}); out.flush();
+
+        byte[] ver = readExactly(in, 1);
+        if (ver[0] != 1) return false;
+
+        int ulen = readExactly(in, 1)[0] & 0xFF;
+        byte[] uname = readExactly(in, ulen);
+        int plen = readExactly(in, 1)[0] & 0xFF;
+        byte[] passwd = readExactly(in, plen);
+
+        String user     = new String(uname, "UTF-8");
+        String passHash = Socks5Auth.sha256Hex(passwd);
+
+        if (!user.equals(socks5User) || !passHash.equals(socks5PassHash)) {
+            out.write(new byte[]{1, 1}); out.flush();
+            return false;
+        }
+        out.write(new byte[]{1, 0}); out.flush();
+        return true;
+    }
+
+    private void handleOriginal(Socket client, InputStream in, OutputStream out,
+                                 String dst, int port) throws Exception {
+        if (!TgConstants.isTelegramIp(dst)) {
+            handlePassthrough(client, in, out, dst, port); return;
+        }
+
+        out.write(socks5Reply(0)); out.flush();
+
+        byte[] init = readExactly(in, 64);
+        if (TgConstants.isHttp(init)) { client.close(); return; }
+
+        int[] dcInfo = CryptoUtils.dcFromInit(init);
+        int dc = -1; boolean isMedia = false;
+
+        if (dcInfo != null) { dc = dcInfo[0]; isMedia = dcInfo[1] == 1; }
+        if (dcInfo == null && TgConstants.IP_TO_DC.containsKey(dst)) {
+            int[] info = TgConstants.IP_TO_DC.get(dst);
+            dc = info[0]; isMedia = info[1] == 1;
+        }
+
+        if (dc < 1 || dc > 5 || !TgConstants.DC_IPS.containsKey(dc)) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        String dcKey = dc + ":" + isMedia;
+        long   now   = System.currentTimeMillis();
+
+        if (wsBlacklist.contains(dcKey)) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+        Long fu = failUntil.get(dcKey);
+        if (fu != null && now < fu) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        String[]     domains  = TgConstants.wsDomains(dc, isMedia);
+        String       targetIp = TgConstants.DC_IPS.get(dc);
+        RawWebSocket ws       = wsPool.get(dc, isMedia, targetIp, domains);
+        boolean hadRedirect = false, allRedirects = true;
+
+        if (ws == null) {
+            for (String domain : domains) {
+                try {
+                    ws = RawWebSocket.connect(targetIp, domain, 10000);
+                    allRedirects = false; break;
+                } catch (RawWebSocket.WsRedirectException e) {
+                    hadRedirect = true; errors.incrementAndGet();
+                } catch (Exception e) {
+                    allRedirects = false; errors.incrementAndGet(); break;
+                }
+            }
+        }
+
+        if (ws == null) {
+            if (hadRedirect && allRedirects) wsBlacklist.add(dcKey);
+            else failUntil.put(dcKey, now + (long)(TgConstants.COOLDOWN * 1000));
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        failUntil.remove(dcKey);
+        connWs.incrementAndGet();
+        ws.send(init);
+        bridgeWs(in, out, ws, null);
+    }
+
+    private void handlePython(Socket client, InputStream in, OutputStream out,
+                               String dst, int port) throws Exception {
+        if (!TgConstants.isTelegramIp(dst)) {
+            handlePassthrough(client, in, out, dst, port); return;
+        }
+
+        out.write(socks5Reply(0)); out.flush();
+
+        byte[] init = readExactly(in, 64);
+        if (TgConstants.isHttp(init)) { client.close(); return; }
+
+        int[] dcInfo = CryptoUtils.dcFromInit(init);
+        boolean patched = false;
+        int dc = -1; boolean isMedia = false;
+
+        if (dcInfo != null) { dc = dcInfo[0]; isMedia = dcInfo[1] == 1; }
+        if (dcInfo == null && TgConstants.IP_TO_DC.containsKey(dst)) {
+            int[] info = TgConstants.IP_TO_DC.get(dst);
+            dc = info[0]; isMedia = info[1] == 1;
+            if (TgConstants.DC_IPS.containsKey(dc)) {
+                init = CryptoUtils.patchDc(init, isMedia ? dc : -dc);
+                patched = true;
+            }
+        }
+
+        if (dc < 1 || dc > 5 || !TgConstants.DC_IPS.containsKey(dc)) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        String dcKey = dc + ":" + isMedia;
+        long   now   = System.currentTimeMillis();
+
+        if (wsBlacklist.contains(dcKey)) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+        Long fu = failUntil.get(dcKey);
+        if (fu != null && now < fu) {
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        String[]     domains  = TgConstants.wsDomains(dc, isMedia);
+        String       targetIp = TgConstants.DC_IPS.get(dc);
+        RawWebSocket ws       = wsPool.get(dc, isMedia, targetIp, domains);
+        boolean hadRedirect = false, allRedirects = true;
+
+        if (ws == null) {
+            for (String domain : domains) {
+                try {
+                    ws = RawWebSocket.connect(targetIp, domain, 10000);
+                    allRedirects = false; break;
+                } catch (RawWebSocket.WsRedirectException e) {
+                    hadRedirect = true; errors.incrementAndGet();
+                } catch (Exception e) {
+                    allRedirects = false; errors.incrementAndGet(); break;
+                }
+            }
+        }
+
+        if (ws == null) {
+            if (hadRedirect && allRedirects) wsBlacklist.add(dcKey);
+            else failUntil.put(dcKey, now + (long)(TgConstants.COOLDOWN * 1000));
+            tcpFallback(client, in, out, dst, port, init); return;
+        }
+
+        failUntil.remove(dcKey);
+        connWs.incrementAndGet();
+        ws.send(init);
+        bridgeWs(in, out, ws, patched ? init : null);
+    }
+
+    private void handleVless(Socket client, InputStream in, OutputStream out,
+                              String dst, int port) throws Exception {
+        if (vlessUri == null || vlessUri.isEmpty()) {
+            out.write(socks5Reply(5)); out.flush(); client.close(); return;
+        }
+
+        out.write(socks5Reply(0)); out.flush();
+
+        VlessClient vless = new VlessClient(vlessUri);
+        try {
+            vless.connect(dst, port);
+        } catch (Exception e) {
+            errors.incrementAndGet(); client.close(); return;
+        }
+
+        connWs.incrementAndGet();
+        final Object lock = new Object();
+
+        Thread upThread = new Thread(() -> {
+            try {
+                byte[] buf = new byte[TgConstants.BUF];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    bytesUp.addAndGet(n);
+                    vless.sendData(Arrays.copyOf(buf, n));
+                    notifyStats();
+                }
+            } catch (Exception ignored) {
+            } finally {
+                vless.disconnect();
+                try { client.close(); } catch (Exception ignored) {}
+            }
+        });
+
+        Thread downThread = new Thread(() -> {
+            try {
+                while (vless.isConnected()) {
+                    byte[] data = vless.receiveData();
+                    if (data == null) break;
+                    bytesDown.addAndGet(data.length);
+                    out.write(data);
+                    out.flush();
+                    notifyStats();
+                }
+            } catch (Exception ignored) {
+            } finally {
+                vless.disconnect();
+                try { client.close(); } catch (Exception ignored) {}
+            }
+        });
+
+        upThread.setDaemon(true);
+        downThread.setDaemon(true);
+        upThread.start();
+        downThread.start();
+        try { upThread.join(); }   catch (InterruptedException ignored) {}
+        try { downThread.join(); } catch (InterruptedException ignored) {}
+    }
+
+    private void handlePassthrough(Socket client, InputStream in, OutputStream out,
+                                   String dst, int port) throws Exception {
+        Socket remote = new Socket();
+        try {
+            remote.connect(new InetSocketAddress(dst, port), 10000);
+            remote.setReceiveBufferSize(524288);
+            remote.setSendBufferSize(524288);
+            remote.setTcpNoDelay(true);
+            remote.setKeepAlive(true);
+        } catch (Exception e) {
+            out.write(socks5Reply(5)); out.flush(); client.close(); return;
+        }
+        out.write(socks5Reply(0)); out.flush();
+        InputStream  ri = remote.getInputStream();
+        OutputStream ro = remote.getOutputStream();
+        Thread t1 = new Thread(() -> pipe(in,  ro));
+        Thread t2 = new Thread(() -> pipe(ri, out));
+        t1.setDaemon(true); t2.setDaemon(true);
+        t1.start(); t2.start();
+        try { t1.join(); } catch (InterruptedException ignored) {}
+        try { t2.join(); } catch (InterruptedException ignored) {}
+        try { remote.close(); } catch (Exception ignored) {}
+    }
+
+    private void tcpFallback(Socket client, InputStream in, OutputStream out,
+                              String dst, int port, byte[] init) {
+        connTcp.incrementAndGet();
+        try {
+            Socket remote = new Socket();
+            remote.connect(new InetSocketAddress(dst, port), 10000);
+            remote.setReceiveBufferSize(524288);
+            remote.setSendBufferSize(524288);
+            remote.setTcpNoDelay(true);
+            remote.setKeepAlive(true);
+            InputStream  ri = remote.getInputStream();
+            OutputStream ro = remote.getOutputStream();
+            ro.write(init); ro.flush();
+            Thread t1 = new Thread(() -> pipeWithStats(in,  ro, true));
+            Thread t2 = new Thread(() -> pipeWithStats(ri, out, false));
+            t1.setDaemon(true); t2.setDaemon(true);
+            t1.start(); t2.start();
+            try { t1.join(); } catch (InterruptedException ignored) {}
+            try { t2.join(); } catch (InterruptedException ignored) {}
+            try { remote.close(); } catch (Exception ignored) {}
+        } catch (Exception e) {
+            errors.incrementAndGet();
+        }
+    }
+
+    /**
+     * Full-duplex bridge between a SOCKS5 client and a WebSocket tunnel.
+     *
+     * Fix for download asymmetry (Андрей's bug):
+     *   Previously upThread called ws.close() in its finally block. This set
+     *   ws.closed=true and called socket.close(), immediately killing the socket
+     *   while downThread was still reading the server's response. Media, stickers,
+     *   and avatars (large server→client transfers) were silently dropped.
+     *
+     *   Fix: upThread sends ws.initiateClose() (WS CLOSE frame only, no socket.close()).
+     *   downThread owns the socket lifecycle and exits cleanly when it receives
+     *   the server's WS CLOSE response or an IOException from the closed socket.
+     */
+    private void bridgeWs(InputStream in, OutputStream out, RawWebSocket ws, byte[] initForSplit) {
+        MsgSplitter splitter = null;
+        if (initForSplit != null) {
+            try { splitter = new MsgSplitter(initForSplit); } catch (Exception ignored) {}
+        }
+        final MsgSplitter spl = splitter;
+
+        Thread upThread = new Thread(() -> {
+            try {
+                byte[] buf = new byte[TgConstants.BUF];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    byte[] chunk = Arrays.copyOf(buf, n);
+                    bytesUp.addAndGet(n);
+                    if (spl != null) {
+                        List<byte[]> parts = spl.split(chunk);
+                        if (parts.size() > 1) ws.sendBatch(parts);
+                        else ws.send(parts.get(0));
+                    } else {
+                        ws.send(chunk);
+                    }
+                    notifyStats();
+                }
+            } catch (Exception ignored) {
+            } finally {
+                ws.initiateClose();
+            }
+        });
+
+        Thread downThread = new Thread(() -> {
+            try {
+                byte[] data;
+                while ((data = ws.recv()) != null) {
+                    bytesDown.addAndGet(data.length);
+                    out.write(data);
+                    out.flush();
+                    notifyStats();
+                }
+            } catch (Exception ignored) {
+            } finally {
+                ws.close();
+                try { in.close(); }  catch (Exception ignored) {}
+                try { out.close(); } catch (Exception ignored) {}
+            }
+        });
+
+        upThread.setDaemon(true);
+        downThread.setDaemon(true);
+        upThread.start();
+        downThread.start();
+        try { upThread.join(); }   catch (InterruptedException ignored) {}
+        try { downThread.join(); } catch (InterruptedException ignored) {}
+    }
+
+    private void pipe(InputStream in, OutputStream out) {
+        try {
+            byte[] buf = new byte[TgConstants.BUF];
+            int n;
+            while ((n = in.read(buf)) > 0) { out.write(buf, 0, n); out.flush(); }
+        } catch (Exception ignored) {
+        } finally {
+            try { in.close(); }  catch (Exception ignored) {}
+            try { out.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    private void pipeWithStats(InputStream in, OutputStream out, boolean isUp) {
+        try {
+            byte[] buf = new byte[TgConstants.BUF];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                if (isUp) bytesUp.addAndGet(n); else bytesDown.addAndGet(n);
+                out.write(buf, 0, n); out.flush();
+                notifyStats();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try { in.close(); }  catch (Exception ignored) {}
+            try { out.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    private void notifyStats() {
+        if (statsListener != null)
+            statsListener.onStats(bytesUp.get(), bytesDown.get(), connTotal.get());
+    }
+
+    private static byte[] socks5Reply(int status) {
+        return new byte[]{5, (byte) status, 0, 1, 0, 0, 0, 0, 0, 0};
+    }
+
+    private static byte[] readExactly(InputStream in, int n) throws IOException {
+        byte[] buf = new byte[n];
+        int off = 0;
+        while (off < n) {
+            int r = in.read(buf, off, n - off);
+            if (r == -1) throw new IOException("EOF");
+            off += r;
+        }
+        return buf;
+    }
+}

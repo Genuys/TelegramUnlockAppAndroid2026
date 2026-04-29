@@ -1,0 +1,15 @@
+.gradle
+/build
+!/gradle/wrapper/gradle-wrapper.jar
+!**/src/main/resources/
+!**/src/test/resources/
+app/build/
+*.apk
+*.ap_
+*.dex
+*.class
+.idea
+.vscode
+local.properties
+.DS_Store
+capture.png

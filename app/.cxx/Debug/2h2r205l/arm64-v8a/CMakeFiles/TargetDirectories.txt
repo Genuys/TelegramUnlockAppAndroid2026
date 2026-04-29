@@ -1,0 +1,3 @@
+C:/XONE/TelegramUnlockAppAndroid2026-main/app/.cxx/Debug/2h2r205l/arm64-v8a/CMakeFiles/awg_bridge.dir
+C:/XONE/TelegramUnlockAppAndroid2026-main/app/.cxx/Debug/2h2r205l/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/XONE/TelegramUnlockAppAndroid2026-main/app/.cxx/Debug/2h2r205l/arm64-v8a/CMakeFiles/rebuild_cache.dir

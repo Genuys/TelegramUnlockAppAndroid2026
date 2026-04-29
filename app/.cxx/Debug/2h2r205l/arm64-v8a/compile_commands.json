@@ -1,0 +1,7 @@
+[
+{
+  "directory": "C:/XONE/TelegramUnlockAppAndroid2026-main/app/.cxx/Debug/2h2r205l/arm64-v8a",
+  "command": "C:\\Users\\anime\\AppData\\Local\\Android\\Sdk\\ndk\\25.1.8937393\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=aarch64-none-linux-android21 --sysroot=C:/Users/anime/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dawg_bridge_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -o CMakeFiles\\awg_bridge.dir\\awg_bridge.c.o -c C:\\XONE\\TelegramUnlockAppAndroid2026-main\\app\\src\\main\\cpp\\awg_bridge.c",
+  "file": "C:\\XONE\\TelegramUnlockAppAndroid2026-main\\app\\src\\main\\cpp\\awg_bridge.c"
+}
+]
